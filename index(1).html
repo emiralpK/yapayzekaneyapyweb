@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Kendi AI'nı Eğit - Web Sürümü</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --fg-color: #eee;
+            --accent-color: #00d4ff;
+            --secondary-color: #0f3460;
+            --success-color: #00ff88;
+            --danger-color: #ff0055;
+            --warning-color: #ffaa00;
+        }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            flex: 1;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: var(--accent-color);
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .gpu-info {
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        
+        .tabs {
+            display: flex;
+            background-color: var(--secondary-color);
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
+        }
+        
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: 500;
+            flex: 1;
+            text-align: center;
+            border: none;
+            background-color: transparent;
+            color: var(--fg-color);
+        }
+        
+        .tab:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .tab.active {
+            background-color: rgba(0, 212, 255, 0.2);
+            color: var(--accent-color);
+        }
+        
+        .tab-content {
+            display: none;
+            background-color: var(--secondary-color);
+            padding: 20px;
+            border-radius: 0 0 8px 8px;
+            min-height: 500px;
+        }
+        
+        .tab-content.active {
+            display: flex;
+        }
+        
+        .split-panel {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+        }
+        
+        .left-panel, .right-panel {
+            flex: 1;
+        }
+        
+        .panel {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .panel-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--accent-color);
+            font-size: 16px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background-color: var(--success-color);
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+        }
+        
+        .btn-warning {
+            background-color: var(--warning-color);
+        }
+        
+        .btn-large {
+            padding: 15px 20px;
+            font-size: 16px;
+            width: 100%;
+        }
+        
+        .file-info {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        .radio-group {
+            margin: 10px 0;
+        }
+        
+        .radio-label {
+            display: block;
+            margin: 5px 0;
+            cursor: pointer;
+        }
+        
+        input[type="radio"] {
+            margin-right: 8px;
+        }
+        
+        .slider-container {
+            margin: 15px 0;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 5px;
+        }
+        
+        .progress-container {
+            margin: 15px 0;
+        }
+        
+        .progress {
+            width: 100%;
+            height: 20px;
+            background-color: #333;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .log-container {
+            background-color: #0a0a0a;
+            padding: 10px;
+            border-radius: 5px;
+            height: 300px;
+            overflow-y: auto;
+            color: var(--success-color);
+            font-family: monospace;
+        }
+        
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            background-color: #0a0a0a;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            overflow-y: auto;
+            height: 400px;
+        }
+        
+        .chat-input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--fg-color);
+            border: 1px solid var(--accent-color);
+        }
+        
+        .message {
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        
+        .user-message {
+            background-color: rgba(0, 212, 255, 0.3);
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        
+        .ai-message {
+            background-color: rgba(255, 255, 255, 0.1);
+            align-self: flex-start;
+        }
+        
+        .message-sender {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        
+        .stats-container {
+            background-color: #0a0a0a;
+            color: var(--accent-color);
+            font-family: monospace;
+            padding: 15px;
+            border-radius: 5px;
+            height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .actions-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 14px;
+            color: var(--fg-color);
+            opacity: 0.7;
+        }
+        
+        @media (max-width: 768px) {
+            .split-panel {
+                flex-direction: column;
+            }
+            
+            .tabs {
+                flex-wrap: wrap;
+            }
+            
+            .tab {
+                flex-basis: 50%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Kendi AI Modelini Oluştur</h1>
+            <div class="gpu-info" id="gpu-info">🎮 GPU: Kontrol ediliyor...</div>
+        </header>
+        
+        <div class="tabs">
+            <button class="tab active" data-tab="training">🎓 Eğitim</button>
+            <button class="tab" data-tab="chat">💬 Sohbet</button>
+            <button class="tab" data-tab="info">📊 Model Bilgileri</button>
+        </div>
+        
+        <!-- Eğitim Sekmesi -->
+        <div id="training" class="tab-content active">
+            <div class="split-panel">
+                <div class="left-panel">
+                    <!-- Dosya Yükleme -->
+                    <div class="panel">
+                        <div class="panel-title">📁 Veri Yükleme</div>
+                        <input type="file" id="file-input" class="file-input" accept=".txt">
+                        <label for="file-input" class="btn">📂 Dosya Seç (.txt)</label>
+                        <div id="file-info" class="file-info">Dosya yüklenmedi</div>
+                    </div>
+                    
+                    <!-- Model Ayarları -->
+                    <div class="panel">
+                        <div class="panel-title">⚙️ Model Ayarları</div>
+                        <div>Quantization:</div>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="bits" value="2" checked> 2-bit (En Küçük)
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="bits" value="4"> 4-bit (Dengeli)
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="bits" value="8"> 8-bit (Kaliteli)
+                            </label>
+                        </div>
+                        
+                        <div class="slider-container">
+                            <div>Epoch Sayısı: <span id="epoch-value">10</span></div>
+                            <input type="range" min="1" max="50" value="10" class="slider" id="epoch-slider">
+                        </div>
+                    </div>
+                    
+                    <!-- Eğitim Butonu -->
+                    <button id="train-btn" class="btn btn-success btn-large">🚀 Eğitimi Başlat</button>
+                </div>
+                
+                <div class="right-panel">
+                    <!-- İlerleme -->
+                    <div class="panel">
+                        <div class="panel-title">📊 İlerleme</div>
+                        <div class="progress-container">
+                            <div class="progress">
+                                <div id="progress-bar" class="progress-bar"></div>
+                            </div>
+                            <div id="progress-label">Hazır</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Loglar -->
+                    <div class="panel">
+                        <div class="panel-title">📝 Eğitim Logları</div>
+                        <div id="log-container" class="log-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sohbet Sekmesi -->
+        <div id="chat" class="tab-content">
+            <div class="chat-container">
+                <div id="chat-messages" class="chat-messages"></div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" class="chat-input" placeholder="Mesajınızı yazın...">
+                    <button id="send-btn" class="btn">📤 Gönder</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Model Bilgileri Sekmesi -->
+        <div id="info" class="tab-content">
+            <div id="stats-container" class="stats-container">
+                Model henüz eğitilmedi.
+            </div>
+            <div class="actions-container">
+                <button id="save-model-btn" class="btn btn-success">💾 Modeli Kaydet</button>
+                <button id="load-model-btn" class="btn">📂 Model Yükle</button>
+                <input type="file" id="model-input" class="file-input" accept=".json">
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        &copy; 2023 AI Model Eğitimi | GitHub Pages Sürümü
+    </footer>
+    
+    <script src="app.js"></script>
+</body>
+</html>
